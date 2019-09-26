@@ -8,10 +8,8 @@ import { Navbar } from './Navbar'
 import BetaBanner from './BetaBanner'
 import CookiesNotification from './CookiesNotification'
 import { CookiesProvider } from 'react-cookie'
-// @ts-ignore
-const Home = React.lazy(() => import('./Home'))
-// @ts-ignore
-const RouteResolver = React.lazy(() => import('./RouteResolver'))
+import Home from './Home'
+import RouteResolver from './Home'
 
 const App: React.SFC = () => {
   return (
@@ -23,14 +21,12 @@ const App: React.SFC = () => {
           <CookiesNotification />
           <main className="main">
             {/* all the content below */}
-            <React.Suspense fallback={<div/>}>
-              <Switch>
-                {/* exact takes precendence over RouteResolver */}
-                <Route exact={true} path="/" component={Home}/>
-                {/* all other routes handled programatically */}
-                <Route path="/" component={RouteResolver}/>
-              </Switch>
-            </React.Suspense>
+            <Switch>
+              {/* exact takes precendence over RouteResolver */}
+              <Route exact={true} path="/" component={Home}/>
+              {/* all other routes handled programatically */}
+              <Route path="/" component={RouteResolver}/>
+            </Switch>
           </main>
           <Footer/>
         </AppInitializer>
