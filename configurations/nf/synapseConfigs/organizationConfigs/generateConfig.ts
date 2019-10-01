@@ -101,7 +101,6 @@ export const generateOrgConfig: ReturnSynapseConfigArray = (org, type, sqlOnly =
         name: 'QueryWrapperFlattened',
         props: {
           facetAliases,
-          unitDescription: 'Files',
           title: 'Files',
           synapseId: 'syn16858331',
           rgbIndex: 1,
