@@ -4,14 +4,16 @@ import docTitleConfig from './config/docTitleConfig'
 import { SynapseClient, SynapseConstants } from 'synapse-react-client'
 import { withCookies, ReactCookieProps } from 'react-cookie'
 import { DOWNLOAD_FILES_MENU_TEXT }  from 'synapse-react-client/dist/containers/SynapseTable';
+
 export type AppInitializerState = {
   token: string
-  showLoginDialog: boolean
+  showLoginDialog: boolean,
+  isInvokingDownloadTable: boolean
 }
 // pendo's declaration should be picked up by node_modules/@types/pendo-io-browser but is not
 declare var pendo: any
 export const TokenContext = React.createContext('')
-
+const PORTALS_CONFIG_COOKIE_KEY = 'org.sagebionetworks.security.cookies.portal.config'
 type Props = RouteComponentProps & ReactCookieProps
 
 export type SignInProps = {
@@ -21,15 +23,17 @@ export type SignInProps = {
 }
 
 class AppInitializer extends React.Component<Props, AppInitializerState> {
-
+  
   constructor(props: Props) {
     super(props)
     this.state = {
       token: '',
-      showLoginDialog: false
+      showLoginDialog: false,
+      isInvokingDownloadTable: false
     }
     this.initializePendo = this.initializePendo.bind(this)
     this.updateSynapseCallbackCookie = this.updateSynapseCallbackCookie.bind(this)
+    this.onClick = this.onClick.bind(this)
   }
 
   componentDidMount() {
@@ -63,7 +67,8 @@ class AppInitializer extends React.Component<Props, AppInitializerState> {
       })
     // Technically, the AppInitializer is only mounted once during the portal app lifecycle.
     // But it's best practice to clean up the global listener on component unmount.
-    window.addEventListener('click', this.updateSynapseCallbackCookie)
+    window.addEventListener('click', this.onClick)
+    window.addEventListener('beforeunload', this.onUnload)
     // on first time, also check for the SSO code
     SynapseClient.detectSSOCode()
   }
@@ -91,7 +96,13 @@ class AppInitializer extends React.Component<Props, AppInitializerState> {
     })
   }
 
+  onUnload = (ev: any) => {
+    // set the cookie before loading another site
+    this.updateSynapseCallbackCookie()
+  }
+
   componentWillUnmount() {
+    window.removeEventListener('beforeunload', this.onUnload)
     window.removeEventListener('click', this.updateSynapseCallbackCookie)
   }
   
@@ -146,28 +157,37 @@ class AppInitializer extends React.Component<Props, AppInitializerState> {
     )
   }
 
+  onClick(
+    ev: MouseEvent
+  ) {
+    let showLoginDialog: boolean = false
+    let isInvokingDownloadTable: boolean = false
+    if (ev.target instanceof HTMLAnchorElement) {
+      const anchorElement = ev.target as HTMLAnchorElement
+      // return if it doesn't contain synapse.org
+      isInvokingDownloadTable = anchorElement.text === DOWNLOAD_FILES_MENU_TEXT
+    }
+
+    if (ev.target instanceof HTMLButtonElement) {
+      const buttonElement = ev.target as HTMLButtonElement
+      if (buttonElement.classList.contains(SynapseConstants.SRC_SIGN_IN_CLASS)) {
+        showLoginDialog = true
+      }
+    }
+
+    this.setState({ showLoginDialog, isInvokingDownloadTable })
+  }
   /**
    * PORTALS-490: Set Synapse callback cookie
    * Will attempt to set a .synapse.org domain cookie that has enough information to lead the user
    * back to this portal after visiting www.synapse.org.
    */
   updateSynapseCallbackCookie(
-    ev: MouseEvent
   ) {
     if (!this.props || !this.props.cookies) {
       return
     }
-    let isInvokingDownloadTable: boolean = false
-    if (ev.target instanceof HTMLAnchorElement) {
-      const anchorElement = ev.target as HTMLAnchorElement
-      isInvokingDownloadTable = anchorElement.text === DOWNLOAD_FILES_MENU_TEXT
-    }
-    if (ev.target instanceof HTMLButtonElement) {
-      const buttonElement = ev.target as HTMLButtonElement
-      if (buttonElement.classList.contains(SynapseConstants.SRC_SIGN_IN_CLASS)) {
-        this.setState({ showLoginDialog: true })
-      }
-    }
+    const {isInvokingDownloadTable} = this.state
     let color = 'white'
     let background = '#4db7ad'
     let name = ''
@@ -205,7 +225,7 @@ class AppInitializer extends React.Component<Props, AppInitializerState> {
     const domainValue = window.location.hostname.toLowerCase().includes('.synapse.org') ? '.synapse.org' : undefined
     // Cookies provider exists above AppInitializer so the cookies prop will exist
     this.props.cookies.set(
-      'org.sagebionetworks.security.cookies.portal.config',
+      PORTALS_CONFIG_COOKIE_KEY,
       JSON.stringify(cookieValue),
       {
         path: '/',
